@@ -1,0 +1,21 @@
+Possible objectives:
+- Define the appropriate premium
+- Compute reserves
+
+Possible steps:
+- 80% train, 20% test
+- Use Regression models to predict annual medical bills covered by health insurance.
+- Find the most informative feature(s). (Variable selection, Penalized methods)
+- Detect outliers
+- Regression trees
+- Neural Networks
+
+Objectives:
+- Predict costs with features
+- Select important features
+- Design a web page for possible clients of the health insurance. It could contain 2-3 questions.
+
+Attention:
+- In the report, I need to specify the model used in the code (see ppts for reference).
+- Gaussian Linear Models, Generalized Linear Models, LSE
+- Goodness of fit
