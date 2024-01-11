@@ -8,3 +8,230 @@ date: "2024-01-08"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Gaussian Linear Models
+
+Fit a Gaussian linear model to predict a person's annual medical charges covered by health insurance.
+```{r}
+# Import data
+df <- read.csv("insurance.csv")
+head(df)
+```
+```{r}
+# A glance at the dataset
+plot(df$children, df$charges)
+```
+
+
+```{r}
+# Perform one-hot-encoding to categorical values
+encoded_data <- model.matrix(~ . - 1, data = df)
+encoded_df <- as.data.frame(encoded_data)
+
+head(encoded_df)
+```
+```{r}
+# Shuffle the dataframe by rows
+encoded_df <- encoded_df[sample(nrow(df)), ]
+
+# Split the data into 80% of training and 20% of testing
+split_point <- round(nrow(encoded_df) * 0.8)
+train_data <- encoded_df[1:split_point,]
+test_data <- encoded_df[(split_point + 1):nrow(encoded_df),]
+```
+Column "sexmale" is not needed.
+P-value is small, and R-squared value is big, so the model makes sense.
+```{r}
+train_data_neat <- train_data[,-c(2,3,7,8,9)]
+```
+
+
+```{r}
+# Fit Gaussian Linear Model
+gl_mdl_neat <- lm(charges ~ ., data = train_data_neat)
+
+summary(gl_mdl)
+```
+
+
+```{r}
+# Analyze residuals
+residuals <- residuals(gl_mdl)
+
+# Create diagnostic plots
+par(mfrow = c(2, 2))  # Set up a 2x2 layout for multiple plots
+
+# 1. Residuals vs Fitted Values
+plot(gl_mdl, which = 1)
+
+# 2. Normal Q-Q Plot
+plot(gl_mdl, which = 2)
+
+# 3. Scale-Location Plot (sqrt(|residuals|) vs Fitted Values)
+plot(gl_mdl, which = 3)
+
+# 4. Residuals vs Leverage
+plot(gl_mdl, which = 5)
+
+# Reset the layout
+par(mfrow = c(1, 1))
+
+# You can also create a histogram of residuals
+hist(residuals, main = "Histogram of Residuals", xlab = "Residuals")
+```
+```{r}
+# Detect outliers
+residuals <- residuals(gl_mdl) / sd(residuals(gl_mdl))
+
+# Create a scatter plot of xi against standardized residuals
+par(mfrow = c(1, 1))  # Set up a single plot
+
+x <- 1:nrow(train_data)
+
+# Create the scatter plot
+plot(x, residuals, main = "Scatter Plot of xi vs Standardized Residuals", xlab = "xi", ylab = "Standardized Residuals")
+
+# Add a horizontal line at the threshold
+threshold <- 2  # Adjust the threshold as needed
+abline(h = threshold, col = "red", lty = 2)
+
+# Identify potential outliers (points with standardized residuals greater than a threshold)
+outlier_indices <- which(abs(residuals) > 2)  # Adjust the threshold as needed
+
+# Highlight potential outliers on the plot
+points(x[outlier_indices], residuals[outlier_indices], col = "red", pch = 16)
+```
+```{r}
+train_data_neat <- train_data[-outlier_indices,]
+gl_mdl_neat <- lm(charges ~ ., data = train_data_neat)
+
+summary(gl_mdl_neat)
+```
+
+```{r}
+# Test the model
+predictions_glm_neat <- predict(gl_mdl_neat, newdata = test_data)
+
+# Evaluate the model performance by RMSE
+library(Metrics)
+rmse_glm_neat <- rmse(test_data$charges, predictions_glm_neat)
+scaled_rmse_glm_neat <- rmse_glm_neat / mean(test_data$charges)
+cat("Root Mean Squared Error (RMSE):", scaled_rmse_glm_neat, "\n")
+```
+The RMSE is high, suggesting a problem in our model. Maybe the columns are highly correlated.
+
+# Penalized Methods: Ridge & Lasso
+
+```{r}
+library(glmnet)
+
+# Use cross validation 
+lasso_mdl <- cv.glmnet(as.matrix(train_data[,-ncol(train_data)]), train_data$charges, alpha = 1)
+
+coef_lasso <- coef(lasso_mdl, s = 500)  # lambda.min selects the value that minimizes the cross-validated error
+print(coef_lasso)
+```
+```{r}
+# Calculate residuals
+predictions <- predict(lasso_mdl, s = "lambda.min", newx = as.matrix(train_data[, -ncol(train_data)]))
+residuals <- train_data$charges - predictions
+
+# Create diagnostic plots
+par(mfrow = c(2, 2))  # Set up a 2x2 layout for multiple plots
+
+# 1. Residuals vs Fitted Values
+plot(predictions, residuals, main = "Residuals vs Fitted Values", xlab = "Fitted Values", ylab = "Residuals")
+
+# 2. Normal Q-Q Plot
+qqnorm(residuals)
+qqline(residuals)
+
+# 3. Scale-Location Plot (sqrt(|residuals|) vs Fitted Values)
+plot(predictions, sqrt(abs(residuals)), main = "Scale-Location Plot", xlab = "Fitted Values", ylab = "sqrt(|Residuals|)")
+
+# Reset the layout
+par(mfrow = c(1, 1))
+```
+```{r}
+# Test the model
+predictions_lasso <- predict(lasso_mdl, s = 500, newx = as.matrix(test_data[,-ncol(test_data)]), type = "response")
+
+# Evaluate the model performance by RMSE
+rmse_lasso <- rmse(test_data$charges, predictions_lasso)
+scaled_rmse_lasso <- rmse_lasso / mean(test_data$charges)
+cat("Root Mean Squared Error (RMSE):", scaled_rmse_lasso, "\n")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Plot true & predicted values in test_data
+x <- 1:nrow(test_data)
+plot(x, test_data$charges, type = "o", col = "blue", pch = 16, main = "Two Lists in One Plot", xlab = "X-axis", ylab = "Y-axis")
+
+# Overlay the second set of points
+points(x, predictions_lasso, type = "o", col = "red", pch = 16)
+
+# Add a legend
+legend("topright", legend = c("charges", "predicted_charges"), col = c("blue", "red"), pch = 16, cex = 0.8)
+```
+
+# Regression Trees
+
+```{r}
+library(rpart)
+
+tree_mdl <- rpart(charges ~ ., data = train_data, method = "anova", control = rpart.control(maxdepth = 10))
+```
+
+```{r}
+# Detect outliers
+residuals <- residuals(tree_mdl) / sd(residuals(tree_mdl))
+
+# Create a scatter plot of xi against standardized residuals
+par(mfrow = c(1, 1))  # Set up a single plot
+
+x <- 1:nrow(train_data)
+
+# Create the scatter plot
+plot(x, residuals, main = "Scatter Plot of xi vs Standardized Residuals", xlab = "xi", ylab = "Standardized Residuals")
+
+# Add a horizontal line at the threshold
+threshold <- 2  # Adjust the threshold as needed
+abline(h = threshold, col = "red", lty = 2)
+
+# Identify potential outliers (points with standardized residuals greater than a threshold)
+outlier_indices <- which(abs(residuals) > 2)  # Adjust the threshold as needed
+
+# Highlight potential outliers on the plot
+points(x[outlier_indices], residuals[outlier_indices], col = "red", pch = 16)
+```
+
+```{r}
+train_data_neat <- train_data[-outlier_indices,]
+
+tree_mdl_neat <- rpart(charges ~ ., data = train_data_neat, method = "anova", control = rpart.control(maxdepth = 10))
+```
+
+
+```{r}
+# Test the model
+predictions_tree <- predict(tree_mdl_neat, test_data)
+
+# Calculate RMSE
+rmse_tree <- sqrt(mean((test_data$charges - predictions_tree)^2))
+
+scaled_rmse_tree <- rmse_tree / mean(test_data$charges)
+cat("Root Mean Squared Error (RMSE):", scaled_rmse_tree, "\n")
+```

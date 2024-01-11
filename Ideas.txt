@@ -1,4 +1,5 @@
 Possible objectives:
+- Select best model for the dataset
 - Define the appropriate premium
 - Compute reserves
 
