@@ -8,19 +8,53 @@ date: "2024-01-08"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Gaussian Linear Models
+# Import & Visualize data
 
-Fit a Gaussian linear model to predict a person's annual medical charges covered by health insurance.
 ```{r}
 # Import data
 df <- read.csv("insurance.csv")
 head(df)
 ```
 ```{r}
-# A glance at the dataset
-plot(df$children, df$charges)
+library(ggplot2)
+
+theme_set(theme_bw( base_size = 15))
+
+ggplot(df, aes(x = age, y = charges, color = charges)) +
+  geom_point() +
+  labs(x = "Age", y = "Charges") + 
+  scale_color_gradient(low = "blue", high = "red")
+
+ggplot(df, aes(x = bmi, y = charges, color = charges)) +
+  geom_point() +
+  labs(x = "Bmi", y = "Charges") + 
+  scale_color_gradient(low = "blue", high = "red")
 ```
 
+```{r}
+df_factor <- df
+df_factor$children <- factor(df$children)
+df_factor$smoker <- factor(df$smoker)
+df_factor$region <- factor(df$region)
+
+
+ggplot(df_factor, aes(x = children, y = charges, fill = sex)) +
+  geom_boxplot(position = "dodge", color = "black") +
+  scale_fill_manual(values = c("pink", "skyblue")) +
+  labs(x = "Children", y = "Charges", fill = "Sex")
+
+ggplot(df_factor, aes(x = smoker, y = charges, fill = sex)) +
+  geom_boxplot(position = "dodge", color = "black") +
+  scale_fill_manual(values = c("pink", "skyblue")) +
+  labs(x = "Smoker", y = "Charges", fill = "Sex")
+
+ggplot(df_factor, aes(x = region, y = charges, fill = sex)) +
+  geom_boxplot(position = "dodge", color = "black") +
+  scale_fill_manual(values = c("pink", "skyblue")) +
+  labs(x = "region", y = "Charges", fill = "Sex")
+```
+
+# Gaussian Linear Model
 
 ```{r}
 # Perform one-hot-encoding to categorical values
@@ -119,15 +153,19 @@ cat("Root Mean Squared Error (RMSE):", scaled_rmse_glm_neat, "\n")
 ```
 The RMSE is high, suggesting a problem in our model. Maybe the columns are highly correlated.
 
-# Penalized Methods: Ridge & Lasso
+# Penalized Methods: Lasso
 
 ```{r}
 library(glmnet)
 
-# Use cross validation 
-lasso_mdl <- cv.glmnet(as.matrix(train_data[,-ncol(train_data)]), train_data$charges, alpha = 1)
+# Scale the non-categorical columns
+train_data_scaled <- train_data
+train_data_scaled[,c("age","bmi","children")] <- scale(train_data[,c("age","bmi","children")])
 
-coef_lasso <- coef(lasso_mdl, s = 500)  # lambda.min selects the value that minimizes the cross-validated error
+# Use cross validation 
+lasso_mdl <- cv.glmnet(as.matrix(train_data_scaled[,-ncol(train_data_scaled)]), train_data_scaled$charges, alpha = 1)
+
+coef_lasso <- coef(lasso_mdl, s = 'lambda.min')  # lambda.min selects the value that minimizes the cross-validated error
 print(coef_lasso)
 ```
 ```{r}
@@ -153,7 +191,10 @@ par(mfrow = c(1, 1))
 ```
 ```{r}
 # Test the model
-predictions_lasso <- predict(lasso_mdl, s = 500, newx = as.matrix(test_data[,-ncol(test_data)]), type = "response")
+test_data_scaled <- test_data
+test_data_scaled[,c("age","bmi","children")] <- scale(test_data[,c("age","bmi","children")])
+
+predictions_lasso <- predict(lasso_mdl, s = 'lambda.min', newx = as.matrix(test_data_scaled[,-ncol(test_data_scaled)]), type = "response")
 
 # Evaluate the model performance by RMSE
 rmse_lasso <- rmse(test_data$charges, predictions_lasso)
