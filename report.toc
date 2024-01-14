@@ -1,0 +1,11 @@
+\contentsline {section}{\numberline {1}Motivation}{3}{}%
+\contentsline {section}{\numberline {2}Dataset}{3}{}%
+\contentsline {subsection}{\numberline {2.1}Source}{3}{}%
+\contentsline {subsection}{\numberline {2.2}Description}{3}{}%
+\contentsline {subsection}{\numberline {2.3}Visualization}{3}{}%
+\contentsline {section}{\numberline {3}Model Selection}{4}{}%
+\contentsline {subsection}{\numberline {3.1}Steps for Fitting each Model to the Data}{5}{}%
+\contentsline {subsection}{\numberline {3.2}Gaussian Linear Model}{5}{}%
+\contentsline {subsection}{\numberline {3.3}Lasso}{6}{}%
+\contentsline {subsection}{\numberline {3.4}Regression Tree and Random Forest}{6}{}%
+\contentsline {section}{\numberline {4}Conclusion}{7}{}%

@@ -21,12 +21,12 @@ library(ggplot2)
 theme_set(theme_bw( base_size = 15))
 
 ggplot(df, aes(x = age, y = charges, color = charges)) +
-  geom_point() +
+  geom_point(show.legend = FALSE) +
   labs(x = "Age", y = "Charges") + 
   scale_color_gradient(low = "blue", high = "red")
 
 ggplot(df, aes(x = bmi, y = charges, color = charges)) +
-  geom_point() +
+  geom_point(show.legend = FALSE) +
   labs(x = "Bmi", y = "Charges") + 
   scale_color_gradient(low = "blue", high = "red")
 ```
@@ -38,20 +38,25 @@ df_factor$smoker <- factor(df$smoker)
 df_factor$region <- factor(df$region)
 
 
-ggplot(df_factor, aes(x = children, y = charges, fill = sex)) +
-  geom_boxplot(position = "dodge", color = "black") +
-  scale_fill_manual(values = c("pink", "skyblue")) +
-  labs(x = "Children", y = "Charges", fill = "Sex")
+ggplot(df_factor, aes(x = children, y = charges)) +
+  geom_boxplot(position = "dodge", color = "black", aes(fill = children), show.legend = FALSE) +
+  labs(x = "Children", y = "Charges") + 
+  scale_fill_brewer(palette = "Set3")
 
-ggplot(df_factor, aes(x = smoker, y = charges, fill = sex)) +
-  geom_boxplot(position = "dodge", color = "black") +
-  scale_fill_manual(values = c("pink", "skyblue")) +
-  labs(x = "Smoker", y = "Charges", fill = "Sex")
+ggplot(df_factor, aes(x = smoker, y = charges)) +
+  geom_boxplot(position = "dodge", color = "black", aes(fill = smoker), show.legend = FALSE) +
+  labs(x = "Smoker", y = "Charges") + 
+  scale_fill_brewer(palette = "Set3")
 
-ggplot(df_factor, aes(x = region, y = charges, fill = sex)) +
-  geom_boxplot(position = "dodge", color = "black") +
-  scale_fill_manual(values = c("pink", "skyblue")) +
-  labs(x = "region", y = "Charges", fill = "Sex")
+ggplot(df_factor, aes(x = region, y = charges)) +
+  geom_boxplot(position = "dodge", color = "black", aes(fill = region), show.legend = FALSE) +
+  labs(x = "region", y = "Charges") + 
+  scale_fill_brewer(palette = "Set3")
+
+ggplot(df_factor, aes(x = sex, y = charges)) +
+  geom_boxplot(position = "dodge", color = "black", aes(fill = sex), show.legend = FALSE) +
+  labs(x = "Sex", y = "Charges") + 
+  scale_fill_brewer(palette = "Set3")
 ```
 
 # Gaussian Linear Model
@@ -72,67 +77,37 @@ split_point <- round(nrow(encoded_df) * 0.8)
 train_data <- encoded_df[1:split_point,]
 test_data <- encoded_df[(split_point + 1):nrow(encoded_df),]
 ```
-Column "sexmale" is not needed.
-P-value is small, and R-squared value is big, so the model makes sense.
-```{r}
-train_data_neat <- train_data[,-c(2,3,7,8,9)]
-```
-
 
 ```{r}
 # Fit Gaussian Linear Model
-gl_mdl_neat <- lm(charges ~ ., data = train_data_neat)
+gl_mdl <- lm(charges ~ ., data = train_data)
 
 summary(gl_mdl)
 ```
 
-
 ```{r}
-# Analyze residuals
-residuals <- residuals(gl_mdl)
+library(MASS)
 
-# Create diagnostic plots
-par(mfrow = c(2, 2))  # Set up a 2x2 layout for multiple plots
-
-# 1. Residuals vs Fitted Values
-plot(gl_mdl, which = 1)
-
-# 2. Normal Q-Q Plot
-plot(gl_mdl, which = 2)
-
-# 3. Scale-Location Plot (sqrt(|residuals|) vs Fitted Values)
-plot(gl_mdl, which = 3)
-
-# 4. Residuals vs Leverage
-plot(gl_mdl, which = 5)
-
-# Reset the layout
-par(mfrow = c(1, 1))
-
-# You can also create a histogram of residuals
-hist(residuals, main = "Histogram of Residuals", xlab = "Residuals")
-```
-```{r}
 # Detect outliers
-residuals <- residuals(gl_mdl) / sd(residuals(gl_mdl))
+stu_residuals <- studres(gl_mdl)
 
 # Create a scatter plot of xi against standardized residuals
 par(mfrow = c(1, 1))  # Set up a single plot
 
-x <- 1:nrow(train_data)
+indices <- 1:nrow(train_data)
 
 # Create the scatter plot
-plot(x, residuals, main = "Scatter Plot of xi vs Standardized Residuals", xlab = "xi", ylab = "Standardized Residuals")
+plot(indices, stu_residuals, xlab = "Indices", ylab = "Studentized Residuals", col = "lightgreen", pch = 16)
 
 # Add a horizontal line at the threshold
 threshold <- 2  # Adjust the threshold as needed
 abline(h = threshold, col = "red", lty = 2)
 
 # Identify potential outliers (points with standardized residuals greater than a threshold)
-outlier_indices <- which(abs(residuals) > 2)  # Adjust the threshold as needed
+outlier_indices <- which(abs(stu_residuals) > 2)  # Adjust the threshold as needed
 
 # Highlight potential outliers on the plot
-points(x[outlier_indices], residuals[outlier_indices], col = "red", pch = 16)
+points(indices[outlier_indices], stu_residuals[outlier_indices], col = "red", pch = 16)
 ```
 ```{r}
 train_data_neat <- train_data[-outlier_indices,]
@@ -140,6 +115,23 @@ gl_mdl_neat <- lm(charges ~ ., data = train_data_neat)
 
 summary(gl_mdl_neat)
 ```
+
+```{r}
+# Analyze standardized residuals
+std_residuals <- rstandard(gl_mdl_neat)
+
+# Normal Q-Q Plot
+ggplot(mapping = aes(sample = std_residuals)) +
+  geom_qq() +
+  geom_qq_line(distribution = qnorm, color = "red") +
+  labs(title = "Normal Q-Q Plot of Standardized Residuals", x = "Standardized Residuals", y = "Theoratical Quantiles")
+
+# Histogram
+ggplot(data.frame(std_residuals = std_residuals), aes(x = std_residuals)) +
+  geom_histogram(binwidth = 0.2, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(x = "Standardized Residuals", y = "Frequency")
+```
+
 
 ```{r}
 # Test the model
@@ -165,36 +157,31 @@ train_data_scaled[,c("age","bmi","children")] <- scale(train_data[,c("age","bmi"
 # Use cross validation 
 lasso_mdl <- cv.glmnet(as.matrix(train_data_scaled[,-ncol(train_data_scaled)]), train_data_scaled$charges, alpha = 1)
 
-coef_lasso <- coef(lasso_mdl, s = 'lambda.min')  # lambda.min selects the value that minimizes the cross-validated error
+coef_lasso <- coef(lasso_mdl, s = 500)  # lambda.min selects the value that minimizes the cross-validated error
 print(coef_lasso)
 ```
+
 ```{r}
-# Calculate residuals
-predictions <- predict(lasso_mdl, s = "lambda.min", newx = as.matrix(train_data[, -ncol(train_data)]))
-residuals <- train_data$charges - predictions
+# Make predictions on the training data
+predictions <- predict(lasso_mdl, as.matrix(train_data_scaled[,-10]))
 
-# Create diagnostic plots
-par(mfrow = c(2, 2))  # Set up a 2x2 layout for multiple plots
+# Calculate R-squared
+mean_response <- mean(train_data$charges)
+ss_total <- sum((train_data$charges - mean_response)^2)
+ss_residual <- sum((train_data$charges - predictions)^2)
+rsquared <- 1 - (ss_residual / ss_total)
 
-# 1. Residuals vs Fitted Values
-plot(predictions, residuals, main = "Residuals vs Fitted Values", xlab = "Fitted Values", ylab = "Residuals")
-
-# 2. Normal Q-Q Plot
-qqnorm(residuals)
-qqline(residuals)
-
-# 3. Scale-Location Plot (sqrt(|residuals|) vs Fitted Values)
-plot(predictions, sqrt(abs(residuals)), main = "Scale-Location Plot", xlab = "Fitted Values", ylab = "sqrt(|Residuals|)")
-
-# Reset the layout
-par(mfrow = c(1, 1))
+# Print the R-squared value
+cat("R-squared value:", rsquared, "\n")
 ```
+
+
 ```{r}
 # Test the model
 test_data_scaled <- test_data
 test_data_scaled[,c("age","bmi","children")] <- scale(test_data[,c("age","bmi","children")])
 
-predictions_lasso <- predict(lasso_mdl, s = 'lambda.min', newx = as.matrix(test_data_scaled[,-ncol(test_data_scaled)]), type = "response")
+predictions_lasso <- predict(lasso_mdl, s = 500, newx = as.matrix(test_data_scaled[,-ncol(test_data_scaled)]), type = "response")
 
 # Evaluate the model performance by RMSE
 rmse_lasso <- rmse(test_data$charges, predictions_lasso)
@@ -202,67 +189,74 @@ scaled_rmse_lasso <- rmse_lasso / mean(test_data$charges)
 cat("Root Mean Squared Error (RMSE):", scaled_rmse_lasso, "\n")
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-# Plot true & predicted values in test_data
-x <- 1:nrow(test_data)
-plot(x, test_data$charges, type = "o", col = "blue", pch = 16, main = "Two Lists in One Plot", xlab = "X-axis", ylab = "Y-axis")
-
-# Overlay the second set of points
-points(x, predictions_lasso, type = "o", col = "red", pch = 16)
-
-# Add a legend
-legend("topright", legend = c("charges", "predicted_charges"), col = c("blue", "red"), pch = 16, cex = 0.8)
-```
-
 # Regression Trees
 
 ```{r}
+# Construct regression tree on all columns
 library(rpart)
 
 tree_mdl <- rpart(charges ~ ., data = train_data, method = "anova", control = rpart.control(maxdepth = 10))
+
+# Make predictions on the training data
+predictions <- predict(tree_mdl, train_data)
+
+# Calculate R-squared
+mean_response <- mean(train_data$charges)
+ss_total <- sum((train_data$charges - mean_response)^2)
+ss_residual <- sum((train_data$charges - predictions)^2)
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the R-squared value
+cat("R-squared value:", rsquared, "\n")
 ```
 
 ```{r}
 # Detect outliers
-residuals <- residuals(tree_mdl) / sd(residuals(tree_mdl))
+stu_residuals <- residuals(tree_mdl) / sd(residuals(tree_mdl))
 
 # Create a scatter plot of xi against standardized residuals
 par(mfrow = c(1, 1))  # Set up a single plot
 
-x <- 1:nrow(train_data)
+# Create a scatter plot of xi against standardized residuals
+par(mfrow = c(1, 1))  # Set up a single plot
+
+indices <- 1:nrow(train_data)
 
 # Create the scatter plot
-plot(x, residuals, main = "Scatter Plot of xi vs Standardized Residuals", xlab = "xi", ylab = "Standardized Residuals")
+plot(indices, stu_residuals, xlab = "Indices", ylab = "Studentized Residuals", col = "lightgreen", pch = 16)
 
 # Add a horizontal line at the threshold
 threshold <- 2  # Adjust the threshold as needed
 abline(h = threshold, col = "red", lty = 2)
 
 # Identify potential outliers (points with standardized residuals greater than a threshold)
-outlier_indices <- which(abs(residuals) > 2)  # Adjust the threshold as needed
+outlier_indices <- which(abs(stu_residuals) > 2)  # Adjust the threshold as needed
 
 # Highlight potential outliers on the plot
-points(x[outlier_indices], residuals[outlier_indices], col = "red", pch = 16)
+points(indices[outlier_indices], stu_residuals[outlier_indices], col = "red", pch = 16)
 ```
 
 ```{r}
 train_data_neat <- train_data[-outlier_indices,]
 
 tree_mdl_neat <- rpart(charges ~ ., data = train_data_neat, method = "anova", control = rpart.control(maxdepth = 10))
+
+# Make predictions on the cleaned training data
+predictions <- predict(tree_mdl_neat, train_data_neat)
+
+# Calculate R-squared
+mean_response <- mean(train_data_neat$charges)
+ss_total <- sum((train_data_neat$charges - mean_response)^2)
+ss_residual <- sum((train_data_neat$charges - predictions)^2)
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the R-squared value
+cat("R-squared value:", rsquared, "\n")
+```
+```{r}
+library(rpart.plot)
+
+rpart.plot(tree_mdl_neat)
 ```
 
 
@@ -276,3 +270,74 @@ rmse_tree <- sqrt(mean((test_data$charges - predictions_tree)^2))
 scaled_rmse_tree <- rmse_tree / mean(test_data$charges)
 cat("Root Mean Squared Error (RMSE):", scaled_rmse_tree, "\n")
 ```
+
+```{r}
+# Plot true & predicted values in test_data
+x <- 1:nrow(test_data)
+plot(x, test_data$charges, type = "o", col = "blue", pch = 16, main = "Two Lists in One Plot", xlab = "X-axis", ylab = "Y-axis")
+
+# Overlay the second set of points
+points(x, predictions_lasso, type = "o", col = "red", pch = 16)
+
+# Add a legend
+legend("topright", legend = c("charges", "predicted_charges"), col = c("blue", "red"), pch = 16, cex = 0.8)
+```
+
+# Random Forest
+
+```{r}
+library(randomForest)
+
+forest_mdl <- randomForest(charges ~ ., data = train_data, ntree = 100, mtry = 9)
+```
+
+```{r}
+predictions <- predict(forest_mdl, train_data)
+
+# Calculate R-squared
+mean_response <- mean(train_data$charges)
+ss_total <- sum((train_data$charges - mean_response)^2)
+ss_residual <- sum((train_data$charges - predictions)^2)
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the R-squared value
+cat("R-squared value:", rsquared, "\n")
+```
+
+```{r}
+# Analyze standardized residuals
+residuals <- predict(forest_mdl, train_data) - train_data$charges
+std_residuals <- residuals / sd(residuals)
+
+# Normal Q-Q Plot
+ggplot(mapping = aes(sample = std_residuals)) +
+  geom_qq() +
+  geom_qq_line(distribution = qnorm, color = "red") +
+  labs(title = "Normal Q-Q Plot of Standardized Residuals", x = "Standardized Residuals", y = "Theoratical Quantiles")
+
+# Histogram
+ggplot(data.frame(std_residuals = std_residuals), aes(x = std_residuals)) +
+  geom_histogram(binwidth = 0.2, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(x = "Standardized Residuals", y = "Frequency")
+```
+
+```{r}
+# Test the model
+predictions_forest <- predict(forest_mdl, test_data)
+
+# Calculate RMSE
+rmse_forest <- sqrt(mean((test_data$charges - predictions_forest)^2))
+
+scaled_rmse_forest <- rmse_forest / mean(test_data$charges)
+cat("Root Mean Squared Error (RMSE):", scaled_rmse_forest, "\n")
+```
+
+
+
+
+
+
+
+
+
+
